@@ -3,44 +3,49 @@ package com.example.springkeycloak.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@EnableWebFluxSecurity
 public class SecurityConfig {
 
     @Value("${spring.security.oauth2.client.provider.keycloak.jwk-set-uri}")
-    String jwkSetUri;
+    private String jwkSetUri;
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(request -> {
-                    CorsConfiguration config = new CorsConfiguration();
-                    config.setAllowCredentials(true); // Allow credentials like cookies
-                    config.addAllowedOrigin("*"); // Allow all origins
-                    config.addAllowedHeader("*"); // Allow all headers
-                    config.addAllowedMethod("*"); // Allow all HTTP methods
-                    return config;
-                }))
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/public/**").permitAll()
-                        .anyExchange().authenticated()
+                .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for APIs
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Configure CORS
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/public/**").permitAll() // Allow public paths
+                        .anyRequest().authenticated() // Authenticate all other requests
                 )
-                .oauth2ResourceServer(ServerHttpSecurity.OAuth2ResourceServerSpec::jwt);
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt); // Configure JWT-based authentication
         return http.build();
     }
 
     @Bean
-    public ReactiveJwtDecoder jwtDecoder() {
-        return NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri)
-                .build();
+    public JwtDecoder jwtDecoder() {
+        return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+    }
+
+    // CORS Configuration
+    private UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.addAllowedOrigin("http://localhost:5173"); // Allow frontend origin
+        corsConfiguration.addAllowedMethod("*"); // Allow all HTTP methods
+        corsConfiguration.addAllowedHeader("*"); // Allow all headers
+        corsConfiguration.setAllowCredentials(true); // Allow cookies or credentials if required
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", corsConfiguration);
+        return source;
     }
 }

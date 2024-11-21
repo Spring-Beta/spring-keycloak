@@ -14,7 +14,6 @@ public class ApiController {
         return "This is a public endpoint!";
     }
 
-    @CrossOrigin(origins = "*")
     @GetMapping("/secure-endpoint")
     public String secureEndpoint() {
         return "This is a secure endpoint! You are authenticated.";
